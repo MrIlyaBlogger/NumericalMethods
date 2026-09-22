@@ -225,7 +225,7 @@ def max_vector_error(a: list[float], b: list[float]) -> float:
 
 
 def main():
-    a, b = read_system("input.txt")
+    a, b = read_system("input1.1.txt")
 
     l, u, p, swaps = lu_decomposition(a)
 
