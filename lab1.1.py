@@ -69,134 +69,129 @@ def multiply_matrix_vector(a, b):
     ]
 
 
-def gaussian_elimination(a, b):
+def lu_decomposition(a):
     n = len(a)
-    matrix = copy_matrix(a)
-    vector = b[:]
+    u = copy_matrix(a)
+    l = identity_matrix(n)
+    p = identity_matrix(n)
     swaps = 0
 
     for k in range(n - 1):
         pivot_row = max(
             range(k, n),
-            key=lambda i: abs(matrix[i][k])
+            key=lambda i: abs(u[i][k])
         )
 
-        if abs(matrix[pivot_row][k]) < EPS:
-            raise ValueError(
-                "Система не имеет единственного решения."
-            )
+        if abs(u[pivot_row][k]) < EPS:
+            raise ValueError("Матрица вырожденная.")
 
         if pivot_row != k:
-            matrix[k], matrix[pivot_row] = (
-                matrix[pivot_row],
-                matrix[k],
+            u[k], u[pivot_row] = (
+                u[pivot_row],
+                u[k],
             )
-            vector[k], vector[pivot_row] = (
-                vector[pivot_row],
-                vector[k],
+
+            p[k], p[pivot_row] = (
+                p[pivot_row],
+                p[k],
             )
+
+            if k > 0:
+                l[k][:k], l[pivot_row][:k] = (
+                    l[pivot_row][:k],
+                    l[k][:k],
+                )
+
             swaps += 1
 
+        pivot = u[k][k]
+
         for i in range(k + 1, n):
-            factor = matrix[i][k] / matrix[k][k]
+            factor = u[i][k] / pivot
+            l[i][k] = factor
 
             for j in range(k, n):
-                matrix[i][j] -= factor * matrix[k][j]
+                u[i][j] -= factor * u[k][j]
 
-            vector[i] -= factor * vector[k]
-            matrix[i][k] = 0.0
+            u[i][k] = 0.0
 
-    if abs(matrix[n - 1][n - 1]) < EPS:
-        raise ValueError(
-            "Система не имеет единственного решения."
-        )
+    if abs(u[n - 1][n - 1]) < EPS:
+        raise ValueError("Матрица вырожденная.")
 
-    return matrix, vector, swaps
+    return l, u, p, swaps
 
 
-def back_substitution(a, b):
-    n = len(a)
+def forward_substitution(l, b):
+    n = len(l)
+    y = [0.0] * n
+
+    for i in range(n):
+        value = b[i]
+
+        for j in range(i):
+            value -= l[i][j] * y[j]
+
+        if abs(l[i][i]) < EPS:
+            raise ValueError(
+                "Нулевой диагональный элемент матрицы L."
+            )
+
+        y[i] = value / l[i][i]
+
+    return y
+
+
+def back_substitution(u, b):
+    n = len(u)
     x = [0.0] * n
 
     for i in range(n - 1, -1, -1):
         value = b[i]
 
         for j in range(i + 1, n):
-            value -= a[i][j] * x[j]
+            value -= u[i][j] * x[j]
 
-        if abs(a[i][i]) < EPS:
+        if abs(u[i][i]) < EPS:
             raise ValueError(
-                "Нулевой диагональный элемент."
+                "Нулевой диагональный элемент матрицы U."
             )
 
-        x[i] = value / a[i][i]
+        x[i] = value / u[i][i]
 
     return x
 
 
-def solve_gauss(a, b):
-    triangular, new_b, swaps = gaussian_elimination(a, b)
-    x = back_substitution(triangular, new_b)
+def solve_lu(l, u, p, b):
+    permuted_b = multiply_matrix_vector(p, b)
+    y = forward_substitution(l, permuted_b)
+    x = back_substitution(u, y)
 
-    return x, triangular, new_b, swaps
-
-
-def determinant_gauss(a):
-    triangular, _, swaps = gaussian_elimination(
-        a,
-        [0.0] * len(a)
-    )
-
-    determinant = -1.0 if swaps % 2 else 1.0
-
-    for i in range(len(a)):
-        determinant *= triangular[i][i]
-
-    return determinant
+    return x
 
 
-def inverse_gauss(a):
-    n = len(a)
-    augmented = [
-        a[i][:] + identity_matrix(n)[i]
-        for i in range(n)
-    ]
+def inverse_lu(l, u, p):
+    n = len(l)
+    inverse = [[0.0] * n for _ in range(n)]
 
-    swaps = 0
+    for column in range(n):
+        e = [0.0] * n
+        e[column] = 1.0
 
-    for k in range(n):
-        pivot_row = max(
-            range(k, n),
-            key=lambda i: abs(augmented[i][k])
-        )
-
-        if abs(augmented[pivot_row][k]) < EPS:
-            raise ValueError("Матрица вырожденная.")
-
-        if pivot_row != k:
-            augmented[k], augmented[pivot_row] = (
-                augmented[pivot_row],
-                augmented[k],
-            )
-            swaps += 1
-
-        pivot = augmented[k][k]
-
-        for j in range(2 * n):
-            augmented[k][j] /= pivot
+        current_column = solve_lu(l, u, p, e)
 
         for i in range(n):
-            if i == k:
-                continue
+            inverse[i][column] = current_column[i]
 
-            factor = augmented[i][k]
+    return inverse
 
-            for j in range(2 * n):
-                augmented[i][j] -= factor * augmented[k][j]
 
-            augmented[i][k] = 0.0
+def determinant_lu(u, swaps):
+    determinant = -1.0 if swaps % 2 else 1.0
 
-    return [row[n:] for row in augmented]
+    for i in range(len(u)):
+        determinant *= u[i][i]
+
+    return determinant
 
 
 def print_matrix(name, matrix):
@@ -232,33 +227,33 @@ def max_vector_error(a, b):
 def main():
     a, b = read_system("input.txt")
 
-    x, triangular, transformed_b, swaps = solve_gauss(a, b)
-    inverse = inverse_gauss(a)
-    determinant = determinant_gauss(a)
+    l, u, p, swaps = lu_decomposition(a)
+
+    x = solve_lu(l, u, p, b)
+    inverse = inverse_lu(l, u, p)
+    determinant = determinant_lu(u, swaps)
 
     identity = identity_matrix(len(a))
+
+    lu_product = multiply_matrices(l, u)
+    pa_product = multiply_matrices(p, a)
     inverse_check = multiply_matrices(a, inverse)
     solution_check = multiply_matrix_vector(a, x)
 
     print_matrix("Исходная матрица A:", a)
     print_vector("Вектор b:", b)
 
-    print_matrix(
-        "Матрица после прямого хода метода Гаусса:",
-        triangular
-    )
-    print_vector(
-        "Правая часть после прямого хода:",
-        transformed_b
-    )
+    print_matrix("Матрица L:", l)
+    print_matrix("Матрица U:", u)
+    print_matrix("Матрица перестановок P:", p)
 
-    print_vector(
-        "Решение системы Ax = b:",
-        x
-    )
+    print_matrix("Результат L * U:", lu_product)
+    print_matrix("Результат P * A:", pa_product)
+
+    print_vector("Решение системы Ax = b:", x)
 
     print_matrix(
-        "Обратная матрица A^(-1):",
+        "Обратная матрица A^(-1), найденная через LU-разложение:",
         inverse
     )
 
@@ -281,14 +276,18 @@ def main():
         f"{max_matrix_error(inverse_check, identity):.3e}"
     )
 
-    print_vector(
-        "Проверка A * x:", solution_check)
+    print(
+        "Максимальная ошибка L * U - P * A: "
+        f"{max_matrix_error(lu_product, pa_product):.3e}"
+    )
 
-    print_vector(
-        "Исходный вектор b:", b)
+    print_vector("Проверка A * x:", solution_check)
+    print_vector("Исходный вектор b:", b)
 
     print(
-        "Максимальная ошибка A * x - b: " f"{max_vector_error(solution_check, b):.3e}")
+        "Максимальная ошибка A * x - b: "
+        f"{max_vector_error(solution_check, b):.3e}"
+    )
 
 
 if __name__ == "__main__":
