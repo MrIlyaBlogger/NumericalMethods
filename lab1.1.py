@@ -79,7 +79,7 @@ def lu_decomposition(a):
     for k in range(n - 1):
         pivot_row = max(
             range(k, n),
-            key=lambda i: abs(u[i][k])
+            key=lambda row: abs(u[row][k])
         )
 
         if abs(u[pivot_row][k]) < EPS:
@@ -209,7 +209,7 @@ def print_vector(name, vector):
     print()
 
 
-def max_matrix_error(a, b):
+def max_matrix_error(a: list[list[float]], b: list[list[float]]) -> float:
     return max(
         abs(a[i][j] - b[i][j])
         for i in range(len(a))
@@ -217,7 +217,7 @@ def max_matrix_error(a, b):
     )
 
 
-def max_vector_error(a, b):
+def max_vector_error(a: list[float], b: list[float]) -> float:
     return max(
         abs(a[i] - b[i])
         for i in range(len(a))
