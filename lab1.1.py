@@ -28,7 +28,7 @@ def read_system(filename):
     a = []
     index = 0
 
-    for _ in range(n):
+    for i in range(n):
         a.append(values[index:index + n])
         index += n
 
@@ -171,7 +171,7 @@ def solve_lu(l, u, p, b):
 
 def inverse_lu(l, u, p):
     n = len(l)
-    inverse = [[0.0] * n for _ in range(n)]
+    inverse = [[0.0] * n for i in range(n)]
 
     for column in range(n):
         e = [0.0] * n
