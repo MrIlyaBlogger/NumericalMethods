@@ -19,8 +19,7 @@ def read_system(filename: str) -> tuple[list[list[float]], list[float]]:
 
     if len(data) != expected:
         raise ValueError(
-            f"Ожидалось {expected - 1} чисел после размерности, "
-            f"получено {len(data) - 1}."
+            f"Ожидалось {expected - 1} чисел после размерности, получено {len(data) - 1}."
         )
 
     values = list(map(float, data[1:]))
